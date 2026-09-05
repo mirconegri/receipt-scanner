@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Receipt Scanner",
+    "slug": "receipt-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "receipt-scanner",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0A14",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mirconegri.receiptscanner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Receipt Scanner uses the camera to scan receipts. Photos are processed on this device and are never uploaded."
+      }
+    },
+    "android": {
+      "package": "com.mirconegri.receiptscanner",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A14",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Receipt Scanner uses the camera to scan receipts. Photos are processed on this device and are never uploaded."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0A14"
+        }
+      ]
+    ]
+  }
+}
