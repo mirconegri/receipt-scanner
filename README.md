@@ -1,231 +1,285 @@
-# Receipt Scanner
+# 🧾 Receipt Scanner
 
-Point your camera at a receipt. Everything happens locally.
+[![React Native](https://img.shields.io/badge/React_Native-0.86.3-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
+[![Expo](https://img.shields.io/badge/Expo-SDK_57-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Status](https://img.shields.io/badge/Status-In_Development-orange?style=for-the-badge)]()
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-Receipt Scanner is an open-source, privacy-first mobile app that scans paper
-receipts, reads them with on-device OCR, and turns them into structured,
-searchable records — merchant, date, line items, tax, total. No account, no
-backend, no upload. The photo and the extracted text never leave the phone.
+An open-source, privacy-first mobile app that scans paper receipts, reads them with on-device OCR, and turns them into structured, searchable records — merchant, date, line items, tax, total.
+
+Built around one hard constraint: everything — camera, OCR, parsing, storage — happens on the device. Most receipt-scanning apps default to a cloud OCR call and an account; this one doesn't have that option available even if it wanted to. No account, no backend, no analytics, fully usable offline.
+
+## Table of Contents
+
+- [Preview](#preview)
+- [Features](#features)
+- [Known Issues & Unverified Areas](#known-issues--unverified-areas)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Design Decisions](#design-decisions)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Usage](#usage)
+- [Configuration and Environment](#configuration-and-environment)
+- [Roadmap](#roadmap)
+- [Changelog](#changelog)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Preview
+
+*Drop screenshots into `images/` at the repo root using the names below — a few screens are still missing and will slot in the same way once captured.*
+
+| ![Settings](images/settings.png) | ![History](images/history.png) |
+|:--:|:--:|
+| **Settings** | **History** *(empty state)* |
+
+| ![Camera Permission](images/camera-permission.png) | |
+|:--:|:--:|
+| **Camera Permission** | *(Home, Scanner, Review, Details — coming soon: `home.png`, `scanner.png`, `review.png`, `details.png`)* |
 
 ## Features
 
-- **On-device OCR** — text recognition runs locally via Google ML Kit. No
-  network request is ever made with a receipt image or its text.
-- **Structured extraction** — merchant, address, date, time, receipt number,
-  currency, line items (name/quantity/unit price/total), subtotal, tax,
-  discount, and total, each parsed independently.
-- **Confidence-aware review** — every extracted field is flagged as
-  *detected* or *needs review* before saving, and everything is editable.
-- **Local history** — search and sort saved receipts by date, total, or
-  merchant. No account required, fully usable offline.
-- **Dark, focused UI** — a deliberate design system (see
-  [`src/theme/tokens.ts`](src/theme/tokens.ts)); one violet accent used with
-  restraint, monospace type reserved for numbers.
+### Home
 
-## Screenshots
+- Monthly spend summary card
+- Primary "Scan Receipt" call to action
+- Recent receipts (last 5), tapping through to full details
+- Empty state on first launch, "See all" link through to History once there's at least one receipt
 
-_Coming soon — add screenshots or a short screen recording here once you've
-run the app on a device._
+### Scanner
 
-## Privacy
+- Full-screen camera preview with an animated violet corner-bracket frame
+- Live status text through capture → OCR → processing states
+- Manual capture rather than continuous edge detection (see Design Decisions)
+- A clear, on-brand camera-permission screen, including what happens if access is denied
+- "Processed on device" privacy indicator always visible on screen
 
-This is the app's core premise, not an afterthought:
+### Scan Review
 
-- Receipt photos are captured, OCR'd, and parsed entirely on-device.
-- No receipt image or OCR text is ever sent to a server — there isn't one.
-- No account, no analytics, no third-party tracking SDKs.
-- The only data that leaves the parsing pipeline is what you choose to
-  export or share yourself (not currently a feature — see Roadmap).
+- Every extracted field shown with a confidence badge — *Detected* or *Needs review*
+- Full inline editing: merchant, date, currency, items, subtotal, tax, total
+- Flags when the line items don't add up to the entered total
+- Items can be edited or removed individually before saving
+
+### Receipt Details
+
+- Full read view of a saved receipt
+- Inline edit mode for merchant, date, and item names/prices
+- Delete with a confirmation prompt
+
+### History
+
+- Search by merchant
+- Sort by date, total, or merchant
+- Pull-to-refresh
+- Distinct empty states for "no receipts yet" vs. "no search matches"
+
+### Settings
+
+- Currency picker (EUR / USD / GBP / CHF)
+- Plain-language privacy explanation
+- Saved-receipt count and a "Clear all receipts" action, with confirmation
+- About section with version number and a link to source & license
+
+### General
+
+- Fully on-device — no account, no backend, no analytics, works offline
+- Single dark theme by design, not an unfinished light mode (see Design Decisions)
+- English UI; the parser itself recognizes both English and Italian receipt vocabulary, since the language printed on a receipt and the app's interface language are different concerns
+
+## Known Issues & Unverified Areas
+
+- **Confirmed on a real Android device:** the Settings screen, the History empty state, and the camera-permission screen all render correctly, matching the built design exactly.
+- **Not yet confirmed:** a full capture → OCR → parse → save round trip on a real receipt. Each piece is checked independently — the parser against realistic sample OCR text, the storage layer's SQL against a real SQLite engine, a full Metro bundle exported clean for both iOS and Android — but that's not the same as scanning an actual receipt end to end.
+- No live/continuous receipt edge detection — capture is manual (position, then tap). See Design Decisions.
+- Parsing is heuristic/keyword-based; unusual layouts (handwritten, extremely faded, non-tabular item formats) will likely need the parser extended.
+- The scanner frame's size is computed once at mount, not reactive to window-size changes (e.g. Android split-screen).
+
+## Tech Stack
+
+| Dependency | Version | Notes |
+|---|---|---|
+| Expo SDK | 57 | |
+| React Native | 0.86.3 | New Architecture enabled (`newArchEnabled: true`) |
+| React | 19.2 | |
+| TypeScript | 6.0, strict mode | |
+| `expo-camera` | 57.0.4 | Capture only — see Design Decisions for why not `react-native-vision-camera` |
+| `@react-native-ml-kit/text-recognition` | 2.0.0 | On-device OCR (Google ML Kit). Native module — requires a dev build, not compatible with Expo Go |
+| `expo-sqlite` | 57.0.2 | Sole persistence layer |
+| React Navigation | 7.x | native-stack + bottom-tabs |
+| React's built-in `Animated` API | — | Used instead of `react-native-reanimated` — see Design Decisions |
 
 ## Architecture
 
+### Screens
+
+| Screen | Notes |
+|---|---|
+| `HomeScreen` | Dashboard — monthly spend, scan CTA, recent receipts |
+| `ScannerScreen` | Camera capture → on-device OCR → parse — the app's hero flow |
+| `ScanResultScreen` | Review/edit screen shown right after a scan, before saving |
+| `ReceiptDetailsScreen` | View, edit, and delete a saved receipt |
+| `ReceiptHistoryScreen` | Search and sort all saved receipts |
+| `SettingsScreen` | Currency, privacy info, data management, about |
+
+### Key Modules
+
+| Module | Purpose |
+|---|---|
+| `services/ocr/textRecognition.ts` | Thin wrapper around ML Kit — isolates the vendor package behind local `OcrResult`/`OcrBlock` types |
+| `services/parser/receiptParser.ts` | Pure text → `ParsedReceipt` logic. No React Native dependency — runnable in plain Node |
+| `services/storage/receiptRepository.ts` | SQLite CRUD, search, sort |
+| `services/settings/settingsStore.ts` | Currency and app preferences, persisted in the same database |
+| `theme/tokens.ts` | The entire design system — color, type, spacing, radii, shadow, motion |
+
+### Key Patterns
+
+- Every parsed field carries a confidence (`detected` / `uncertain` / `manual`) instead of being a bare value — the review screen reads this directly to decide what to flag for the user
+- The parser scopes item-line scanning to between the header block and the summary block (subtotal/tax/discount/total keywords), which is what keeps a store address or a VAT/phone number from ever being mistaken for a product line
+- `scripts/verify-parser.ts` and `scripts/verify-sql.cjs` check the two riskiest layers — OCR-text parsing and SQL — against real inputs without needing a device
+
+## Design Decisions
+
+**Why on-device ML Kit instead of a cloud OCR API?** Privacy is the whole premise of this app, not a feature bullet point — a cloud OCR call was never on the table regardless of any accuracy tradeoff, since it would mean a receipt's contents leaving the device.
+
+**Why manual capture instead of live continuous scanning?** Real-time document edge detection needs frame-by-frame computer vision (`react-native-vision-camera` + frame processors), which adds a large native surface that's hard to get right without a device to test against. Position-and-tap is simpler, more reliable, and is how most receipt-scanner apps actually work day to day.
+
+**Why React Native's built-in `Animated` API instead of `react-native-reanimated`?** Reanimated needs its own native build step and worklet configuration. `Animated` ships with core React Native, needs no extra native setup, and was the safer choice to build without a device attached to verify the config against.
+
+**Why does the parser handle Italian receipt vocabulary when the app's UI is English-only?** The UI language and the language printed on a physical receipt are different concerns. The parser recognizes both without it affecting the interface.
+
+**Why SQLite instead of a simpler key-value store?** Receipts need real queries — search by merchant, sort by date or total, sum a month's spending — that a flat key-value store makes awkward. `expo-sqlite` gives that for free.
+
+**Why does the parser return `null` instead of guessing a value it isn't confident about?** An invented total or date is worse than an empty field — a wrong-but-confident-looking number is the kind of error a user won't think to double check. The review screen is where a human confirms it, not the parser.
+
+**Why no light theme?** The dark navy / violet look isn't a color scheme bolted onto the app — it's the whole visual identity, down to the scanner glow. A half-built light mode would dilute that rather than extend it.
+
+## Project Structure
+
 ```
-CameraView (expo-camera)
-   → capture (photo URI)
-   → OCR (ML Kit, on-device)          src/services/ocr
-   → text normalization + parsing     src/services/parser
-   → structured Receipt object        src/types/receipt.ts
-   → review UI (editable)             src/screens/ScanResultScreen.tsx
-   → local storage (SQLite)           src/services/storage
-   → history / details UI             src/screens
+receipt-scanner/
+├── App.tsx                        # Entry point — gesture handler, safe area, root navigator
+├── app.json                       # Expo config — dark UI, camera permissions, plugins
+├── eas.json                       # EAS Build profiles (development / preview / production)
+├── package.json
+├── scripts/
+│   ├── verify-parser.ts           # Runs the parser against sample English/Italian receipts
+│   ├── verify-sql.cjs             # Runs the storage layer's SQL against a real SQLite engine
+│   └── generate-icon.py           # Regenerates the app icon/splash from the theme tokens
+├── src/
+│   ├── theme/tokens.ts            # Design system — color, type, spacing, radii, shadow, motion
+│   ├── types/receipt.ts           # Receipt / ReceiptItem / ParsedReceipt domain model
+│   ├── navigation/                # Typed root stack + bottom tabs
+│   ├── screens/                   # One file per screen — see Architecture above
+│   ├── components/
+│   │   ├── ui/                    # Button, Card, Amount, Badge, EditableField, …
+│   │   ├── receipt/                # ReceiptCard, ReceiptItemRow
+│   │   └── scanner/                # ScannerFrame (animated), ScannerStatus
+│   ├── services/
+│   │   ├── ocr/                   # ML Kit wrapper
+│   │   ├── parser/                # Pure text → ParsedReceipt logic
+│   │   ├── storage/                # SQLite schema + repository
+│   │   └── settings/               # Currency + preferences
+│   ├── hooks/                     # useReceipts, useReceipt
+│   └── utils/                     # Currency/date formatting, id generation, error mapping
+├── images/                        # Screenshots used in this README
+├── LICENSE
+└── README.md
 ```
 
-Each stage is an independent module — the parser, for instance, has no
-dependency on React Native at all and can be run and tested in plain
-Node (see `scripts/verify-parser.ts`).
-
-```
-src/
-  components/    # ui/, receipt/, scanner/ — small, reusable, no business logic
-  hooks/         # useReceipts, useReceipt — data access for screens
-  navigation/    # typed param lists + the root navigator
-  screens/       # one file per screen, composed from components + hooks
-  services/
-    ocr/         # ML Kit wrapper, isolated behind our own types
-    parser/      # pure text → ParsedReceipt logic (keywords, money, dates)
-    storage/     # SQLite schema + repository (CRUD, search, sort)
-    settings/    # currency + app preferences, persisted in the same DB
-  theme/         # design tokens: color, type, spacing, radii, shadows, motion
-  types/         # Receipt / ReceiptItem / ParsedReceipt domain model
-  utils/         # currency + date formatting, id generation, error mapping
-```
-
-### OCR pipeline in detail
-
-`@react-native-ml-kit/text-recognition` does the actual recognition; it's
-wrapped in [`src/services/ocr/textRecognition.ts`](src/services/ocr/textRecognition.ts)
-so the rest of the app depends on a small local interface (`OcrResult`,
-`OcrBlock`) instead of the vendor package directly. The parser
-(`src/services/parser/receiptParser.ts`) then works purely on the resulting
-text: it locates the header block (merchant/address/store metadata), the
-summary block (subtotal/tax/discount/total keywords, in English and
-Italian), and treats everything in between as candidate line items. Money
-and date parsing each handle both US-style (`1,234.56`) and European-style
-(`1.234,56`) formats. A field the parser isn't confident about is returned
-as `null` rather than guessed — the review screen is where the person
-scanning fills those in, not the parser.
-
-## Tech stack
-
-- [Expo](https://expo.dev) SDK 57 (React Native 0.86, React 19.2), TypeScript in strict mode
-- [`expo-camera`](https://docs.expo.dev/versions/latest/sdk/camera/) for capture
-- [`@react-native-ml-kit/text-recognition`](https://www.npmjs.com/package/@react-native-ml-kit/text-recognition) for on-device OCR
-- [`expo-sqlite`](https://docs.expo.dev/versions/latest/sdk/sqlite/) for local storage
-- [React Navigation](https://reactnavigation.org) (native-stack + bottom-tabs)
-- React's built-in `Animated` API for motion — deliberately not
-  `react-native-reanimated`, to keep the animation layer verifiable without
-  its own native build step and babel configuration (see *What hasn't been
-  verified on a device* below)
-
-## Getting started
+## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- An Expo account is **not** required for local development
-- A physical iOS or Android device, or a simulator/emulator with camera
-  support (most simulators don't have a usable camera — a real device is
-  strongly recommended for anything touching the scanner)
+- A physical iOS or Android device is strongly recommended — most simulators/emulators don't have a usable real camera, and this app's core feature is the camera
+- No Expo account required for local development; an account is only needed for EAS Build
 
-### Install
+### Installation
 
 ```bash
+git clone https://github.com/mirconegri/receipt-scanner.git
+cd receipt-scanner
 npm install
 ```
+
+## Usage
+
+### Development
+
+This app uses a native module (on-device OCR), so it **cannot run in Expo Go** — it needs a development build:
+
+```bash
+npx expo prebuild
+npx expo run:android   # or: npx expo run:ios (requires a Mac + Xcode)
+```
+
+After the first build, day-to-day development can go back to `npx expo start` and reopening the app on the device you already built to.
 
 ### Everyday checks
 
 ```bash
-npm run typecheck    # tsc --noEmit
-npm run lint         # eslint .
-npm run verify-parser  # runs the parser against sample receipts, no device needed
-npm run verify-sql     # runs the real storage queries against a real SQLite engine, no device needed
+npm run typecheck      # tsc --noEmit
+npm run lint            # eslint .
+npm run verify-parser   # parser against sample receipts, no device needed
+npm run verify-sql      # storage layer's SQL against a real SQLite engine, no device needed
 ```
 
-### Running the app
-
-This app uses a native module (`@react-native-ml-kit/text-recognition`),
-which means it **cannot run in Expo Go** — you need a development build:
+### Building for testing (no local Xcode/Android Studio needed)
 
 ```bash
-npx expo prebuild        # generates ios/ and android/ native projects
-npx expo run:ios         # or: npx expo run:android
+npx eas-cli@latest login
+npx eas-cli@latest build --profile preview --platform android
+# or --platform ios — still no Mac required, the build runs on Expo's servers
 ```
 
-After the first `run:ios` / `run:android`, day-to-day development can go
-back to `npm start` and reopening the app on the device/simulator you
-already built to — you only need to re-run `expo prebuild` /
-`expo run:*` when native dependencies change.
+## Configuration and Environment
 
-### No Mac, or don't want a local native toolchain? Use EAS
+No `.env` file and no API keys required — there's no backend to configure. Configuration lives in:
 
-`eas.json` is already set up with a `development` profile. This builds in
-the cloud and gives you an installable app — no Xcode or Android Studio
-required locally:
+| File | Purpose |
+|---|---|
+| `app.json` | Expo metadata — app name, bundle identifier/package, dark UI style, camera permission strings, plugins |
+| `eas.json` | EAS Build profiles — `development`, `preview`, `production` |
+| `src/constants.ts` | Repo URL and app version shown in Settings → About |
 
-```bash
-npx eas-cli@latest login          # free Expo account
-npx eas-cli@latest build --profile development --platform android
-# or --platform ios (still no Mac needed — the build runs on Expo's servers)
-```
-
-EAS gives you a link/QR code to install the resulting build straight onto
-your device once it finishes.
-
-### Testing checklist
-
-Simulators/emulators mostly don't have a usable real camera, so a physical
-device is what actually exercises this app's core feature. Once it's
-installed:
-
-1. Grant the camera permission when prompted.
-2. Point it at a real receipt and capture.
-3. Check what OCR actually pulled out — merchant, date, items, total —
-   against the physical receipt.
-4. Try at least one Italian and one non-Italian receipt if you can; the
-   parser has separate keyword handling for each.
-5. Save it, then confirm History and Details show what you'd expect.
-
-If step 3 gets something wrong, `src/services/parser/receiptParser.ts` is
-where to fix it — add the receipt's raw OCR text as a new case in
-`scripts/verify-parser.ts` so the fix becomes a permanent regression check
-instead of a one-off.
-
-## What hasn't been verified on a device
-
-In the interest of not presenting untested things as finished: this project
-was built and its logic verified (type-checking, linting, and the parser's
-own test script) in an environment without a native build toolchain or a
-physical device attached. That means:
-
-- **Verified**: TypeScript compiles clean, ESLint is clean, the receipt
-  parser is checked against realistic sample OCR text (English and Italian
-  receipts, multi-quantity lines, mixed currency formats), and every SQL
-  statement the storage layer runs (schema, the upsert, cascading deletes,
-  the `NULLS LAST` sort, search) is checked against a real SQLite engine in
-  `scripts/verify-sql.cjs`. The full Metro bundle for both iOS and Android
-  was also exported successfully — all 1,145 modules resolve and build,
-  which is a stronger check than type-checking alone since it uses the
-  actual bundler resolution a device would use.
-- **Not yet verified**: the actual camera preview, capture, and on-device
-  OCR call have not run on a real device or simulator — that's the one
-  thing that fundamentally requires physical hardware this environment
-  doesn't have. The integration code is checked against the OCR library's
-  actual (untyped, so this was a manual check, not just `tsc` passing)
-  source rather than assumed from memory, but "does ML Kit actually read
-  this receipt correctly" can only be answered by running it on a device.
-
-If something in the scanner flow needs adjusting once you run it for real,
-`src/screens/ScannerScreen.tsx` and `src/services/ocr/textRecognition.ts`
-are the two files most likely to need it.
-
-## Before you publish
-
-- `LICENSE` — copyright line still has `[Your Name]`, waiting on what
-  exact name to put there
+All receipt data is persisted via `expo-sqlite`, entirely on-device.
 
 ## Roadmap
 
-- [ ] Real-time receipt edge detection (currently: manual capture, then OCR)
-- [ ] Export receipts (CSV/PDF)
-- [ ] Multi-currency receipts (splitting a single trip's receipts by currency)
-- [ ] Category tagging and spend-by-category breakdowns
-- [ ] Additional receipt-format locales beyond English/Italian keyword sets
-- [ ] Optional iCloud/Drive backup of the local database (opt-in, still no
-      receipt content going through a server this project runs)
+1. **Run and fix against a real end-to-end scan** — the one thing that couldn't be verified while building this: point it at an actual receipt and see what the parser gets wrong
+2. **Live receipt edge detection** — replace manual capture with real-time framing feedback
+3. **Export receipts** — CSV/PDF
+4. **Category tagging** and spend-by-category breakdowns
+5. **Additional receipt-format locales** beyond the current English/Italian keyword sets
+6. **Optional cloud backup** of the local database (opt-in, and still no receipt content ever going through a server this project runs)
+
+## Changelog
+
+| Version | Date | Highlights |
+|---|---|---|
+| `v1.0.0` | Sep 2026 | Initial release — camera capture, on-device OCR (English/Italian receipts), local SQLite storage, full review/edit flow, history search/sort, settings |
 
 ## Contributing
 
-Issues and pull requests are welcome. A few conventions this codebase
-follows, worth keeping if you're extending it:
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes with a clear message
+4. Open a Pull Request
 
-- Keep OCR/parsing logic out of components — it belongs in `src/services`,
-  callable and testable without React Native.
-- A parser change should keep `npm run verify-parser` passing, and ideally
-  add a new sample receipt that exercises whatever you changed.
-- Don't invent a value the OCR/parser genuinely didn't detect — return
-  `null` and let the review screen ask the user, rather than guessing.
+A parser change should keep `npm run verify-parser` passing, and ideally add a new sample receipt that exercises whatever you changed. Don't invent a value the OCR/parser didn't confidently detect — return `null` and let the review screen ask the user. For bugs or feature ideas, open an [Issue](https://github.com/mirconegri/receipt-scanner/issues).
+
+### Author
+
+**Mirco Negri** — Computer Science @ UniTrento
+
+[![Portfolio](https://img.shields.io/badge/Portfolio-00599C?style=for-the-badge&logo=globe&logoColor=white)](https://mirconegri.github.io/Portfolio/)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/mirconegri)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mirco-negri-263810225)
+[![Gmail](https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:mirconegri06@gmail.com)
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
