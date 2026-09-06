@@ -6,6 +6,8 @@
 [![Status](https://img.shields.io/badge/Status-In_Development-orange?style=for-the-badge)]()
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
+> 🌐 **<a href="https://receipt-scanner.mirconegri.com" target="_blank">Visit the project website</a>**
+
 An open-source, privacy-first mobile app that scans paper receipts, reads them with on-device OCR, and turns them into structured, searchable records — merchant, date, line items, tax, total.
 
 Built around one hard constraint: everything — camera, OCR, parsing, storage — happens on the device. Most receipt-scanning apps default to a cloud OCR call and an account; this one doesn't have that option available even if it wanted to. No account, no backend, no analytics, fully usable offline.
